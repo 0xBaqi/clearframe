@@ -14,6 +14,21 @@ class Status(StrEnum):
     HUMAN_DECISION_RECORDED = "HUMAN_DECISION_RECORDED"
 
 
+class EventType(StrEnum):
+    PROJECT_SCAN_STARTED = "PROJECT_SCAN_STARTED"
+    CLEARANCE_ITEM_IDENTIFIED = "CLEARANCE_ITEM_IDENTIFIED"
+    EVIDENCE_MATCHED = "EVIDENCE_MATCHED"
+    EVIDENCE_REQUESTED = "EVIDENCE_REQUESTED"
+    DOCUMENT_RECEIVED = "DOCUMENT_RECEIVED"
+    DOCUMENT_DEFICIENCY_FOUND = "DOCUMENT_DEFICIENCY_FOUND"
+    CORRECTION_REQUESTED = "CORRECTION_REQUESTED"
+    SCOPE_MISMATCH_DETECTED = "SCOPE_MISMATCH_DETECTED"
+    HUMAN_REVIEW_REQUESTED = "HUMAN_REVIEW_REQUESTED"
+    HUMAN_DECISION_RECORDED = "HUMAN_DECISION_RECORDED"
+    CASE_RESUMED = "CASE_RESUMED"
+    ITEM_EVIDENCE_COMPLETE = "ITEM_EVIDENCE_COMPLETE"
+
+
 @dataclass(frozen=True)
 class ProjectIntent:
     distribution: list[str]
@@ -46,6 +61,17 @@ class EvidenceRecord:
 @dataclass
 class Operation:
     action: str
+    detail: str
+    evidence_id: str | None = None
+    sequence: int | None = None
+
+
+@dataclass(frozen=True)
+class DomainEvent:
+    """An auditable product event, not a model reasoning trace."""
+
+    event_type: EventType
+    item_id: str
     detail: str
     evidence_id: str | None = None
     sequence: int | None = None

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from packages.core.types import Operation, Status
+from packages.core.types import DomainEvent, Status
 
 
 @dataclass
@@ -17,5 +17,5 @@ class CaseState:
 class ProjectState:
     project_id: str
     cases: dict[str, CaseState] = field(default_factory=dict)
-    operations: list[Operation] = field(default_factory=list)
+    events: list[DomainEvent] = field(default_factory=list)
     received_evidence: list[dict] = field(default_factory=list)

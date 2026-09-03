@@ -3,11 +3,11 @@ from dataclasses import asdict
 from packages.core.clearance.engine import EvidenceTools
 from packages.core.evidence import EvidenceRepository
 from packages.core.state import CaseState, ProjectStore, ProjectState
-from packages.core.types import ClearanceItem, EvidenceRecord, ProjectIntent, Status
+from packages.core.types import ClearanceItem, DomainEvent, EventType, EvidenceRecord, ProjectIntent, Status
 
 
 class ClearanceCaseWorkflow:
-    """Provider-independent administrative case transitions and operations."""
+    """Provider-independent administrative case transitions and event recording."""
 
     def __init__(self, repository: EvidenceRepository, intent: ProjectIntent, store: ProjectStore):
         self.repository, self.intent, self.store = repository, intent, store
@@ -16,7 +16,7 @@ class ClearanceCaseWorkflow:
             record = EvidenceRecord(**record_data)
             if not any(existing.id == record.id for existing in repository.find_evidence(record.item_id)):
                 repository.add_evidence(record)
-        self.tools = EvidenceTools(repository, self.state.operations)
+        self.tools = EvidenceTools(repository)
 
     def _item(self, item_id: str) -> ClearanceItem:
         return next(item for item in self.repository.list_clearance_items() if item.id == item_id)
@@ -24,14 +24,22 @@ class ClearanceCaseWorkflow:
     def _case(self, item_id: str, status: Status) -> CaseState:
         return self.state.cases.setdefault(item_id, CaseState(item_id, status))
 
+    def _event(self, event_type: EventType, item_id: str, detail: str, evidence_id: str | None = None) -> DomainEvent:
+        return self.store.append_event(self.state, event_type, item_id, detail, evidence_id)
+
+    def _start_item(self, item: ClearanceItem) -> None:
+        self._event(EventType.PROJECT_SCAN_STARTED, item.id, "Project scan started.")
+        self._event(EventType.CLEARANCE_ITEM_IDENTIFIED, item.id, f"Clearance item identified: {item.name}.")
+
     def _save(self) -> None:
         self.store.save(self.state)
 
-    def operations_tape(self):
-        return list(self.state.operations)
+    def operations_tape(self) -> list[DomainEvent]:
+        return list(self.state.events)
 
     def create_document_request(self, item_id: str) -> CaseState:
         item = self._item(item_id)
+        self._start_item(item)
         evidence = self.tools.find_evidence(item)
         if evidence:
             raise ValueError("Evidence is already present; inspect received evidence instead.")
@@ -39,7 +47,7 @@ class ClearanceCaseWorkflow:
         request_id = f"request-{item.id}-{len(case.requests) + 1}"
         case.requests.append(request_id)
         case.status = Status.AWAITING_RESPONSE
-        self.store.append_operation(self.state, "create_document_request", f"Created evidence request for {item.name}.")
+        self._event(EventType.EVIDENCE_REQUESTED, item.id, f"Evidence requested for {item.name}.")
         self._save()
         return case
 
@@ -49,26 +57,32 @@ class ClearanceCaseWorkflow:
             self.repository.add_evidence(record)
         if not any(existing["id"] == record.id for existing in self.state.received_evidence):
             self.state.received_evidence.append(asdict(record))
-        self.store.append_operation(self.state, "receive_evidence", f"Received {record.document_type} for {item.name}.", record.id)
+        self._event(EventType.DOCUMENT_RECEIVED, item.id, f"Document received: {record.document_type}.", record.id)
         case = self._case(item.id, Status.AWAITING_RESPONSE)
         inspected = self.tools.read_permission_scope(record)
         case.evidence_ids.append(record.id)
         if inspected.signed is not True or inspected.dated is not True:
-            case.status = Status.SIGNATURE_DEFICIENCY
-            self.store.append_operation(self.state, "detect_signature_deficiency", "Record is missing a signature or date; correction is required.", record.id)
+            self._event(EventType.DOCUMENT_DEFICIENCY_FOUND, item.id, "Record is missing a signature or date.", record.id)
             request_id = f"correction-{item.id}-{len(case.requests) + 1}"
             case.requests.append(request_id)
             case.status = Status.AWAITING_RESPONSE
-            self.store.append_operation(self.state, "request_correction", f"Requested a signed and dated record for {item.name}.", record.id)
+            self._event(EventType.CORRECTION_REQUESTED, item.id, f"Correction requested for {item.name}.", record.id)
             self._save()
             return case
+        self._event(EventType.EVIDENCE_MATCHED, item.id, "Submitted evidence matched to the clearance item.", record.id)
         comparison = self.tools.compare_scope_to_intent(inspected, self.intent)
-        case.status = Status.EVIDENCE_COMPLETE if comparison.matches else Status.SCOPE_MISMATCH
+        if comparison.matches:
+            case.status = Status.EVIDENCE_COMPLETE
+            self._event(EventType.ITEM_EVIDENCE_COMPLETE, item.id, "Evidence supports the declared project intent.", record.id)
+        else:
+            case.status = Status.SCOPE_MISMATCH
+            self._event(EventType.SCOPE_MISMATCH_DETECTED, item.id, "; ".join(comparison.reasons), record.id)
         self._save()
         return case
 
     def begin_human_review(self, item_id: str) -> CaseState:
         item = self._item(item_id)
+        self._start_item(item)
         records = self.tools.find_evidence(item)
         if not records:
             raise ValueError("Case has no evidence to escalate.")
@@ -76,9 +90,8 @@ class ClearanceCaseWorkflow:
         if record.signed is True and record.dated is True:
             raise ValueError("Evidence no longer requires this escalation path.")
         case = self._case(item.id, Status.HUMAN_REVIEW)
-        reason = "The record cannot establish a rights holder or permission scope. Human review is required; no legal determination was made."
-        self.tools.escalate_for_human_review(item, reason)
         case.status, case.paused = Status.HUMAN_REVIEW, True
+        self._event(EventType.HUMAN_REVIEW_REQUESTED, item.id, "Human review requested; no legal determination was made.", record.id)
         self._save()
         return case
 
@@ -89,8 +102,8 @@ class ClearanceCaseWorkflow:
         if not decision.strip():
             raise ValueError("A human decision is required to resume the case.")
         case.human_decision = decision.strip()
-        self.store.append_operation(self.state, "record_human_decision", f"Human decision recorded for {item_id}; no legal determination by agent.")
+        self._event(EventType.HUMAN_DECISION_RECORDED, item_id, "Human decision recorded; no legal determination by agent.")
         case.paused, case.status = False, Status.HUMAN_DECISION_RECORDED
-        self.store.append_operation(self.state, "resume_case", f"Case {item_id} resumed after human decision.")
+        self._event(EventType.CASE_RESUMED, item_id, "Case resumed after human decision.")
         self._save()
         return case
