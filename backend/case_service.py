@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 from backend.evidence_tools import ClearanceTools, SeedEvidenceRepository
 from backend.models import ClearanceItem, EvidenceRecord, ProjectIntent, Status
-from backend.state import CaseState, LocalProjectStore
+from backend.state import CaseState, LocalProjectStore, ProjectState
 
 
 class ClearanceCaseService:
