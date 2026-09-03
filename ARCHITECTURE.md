@@ -1,8 +1,8 @@
 # ClearFrame architecture
 
-## Boundary
+## Provider-agnostic boundary
 
-The frontend is a Next.js + TypeScript application. The agent service is Python. The frontend consumes a small product-facing API contract; it never depends directly on a particular model or agent framework.
+The frontend is a Next.js + TypeScript application. The agent service is Python. `packages/core` owns product rules and has no dependency on Strands, Bedrock, AWS, Gemini, Nebius, or any other provider. The frontend consumes a product-facing API contract; it never depends directly on a model or agent framework.
 
 ```
 Next.js Clearance Reel
@@ -11,18 +11,27 @@ Next.js Clearance Reel
 ClearFrame API contract
         │
         ▼
-Agent adapter ──► evidence tools ──► record/file adapters
+Agent-provider contract ──► provider adapter ──► core evidence tools ──► record/file adapters
         │                                │
         │                                ├─ local seed (Milestone 1)
         │                                ├─ S3 (later)
         │                                └─ DynamoDB (later state)
         ▼
-Strands implementation ──► Amazon Bedrock / AgentCore Runtime (later deployment)
+Strands adapter ──► Amazon Bedrock / AgentCore Runtime (later deployment)
 ```
+
+## Package boundaries
+
+- `packages/core`: statuses, types, evidence comparison, operations, case transitions, and workflow rules.
+- `packages/agent_contract`: provider interface used by product services.
+- `adapters/local`: JSON state and in-memory evidence implementations.
+- `adapters/strands`: the sole Strands-facing provider boundary.
+- `services/agent`: provider-neutral application composition.
+- `demo/night_shift`: fictional fixture data only.
 
 ## Adapter rule
 
-`ClearanceAgent` is the core interface. It accepts a project intent and evidence repository and returns `ClearanceRun`. `StrandsClearanceAgent` is the Milestone 1 implementation. A Gemini, Nebius, or another agent-framework implementation can satisfy the same interface without changing statuses, tools, frontend contracts, or persistence models.
+`AgentProvider` is the provider interface. It accepts a project intent and returns clearance results. A Strands, Gemini, Nebius, or another implementation can satisfy it without changing statuses, tools, frontend contracts, persistence models, or workflow rules.
 
 ## Agent design
 
