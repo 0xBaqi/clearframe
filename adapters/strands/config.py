@@ -1,0 +1,24 @@
+"""Environment-driven configuration for the ClearFrame Strands adapter."""
+from dataclasses import dataclass
+import os
+
+
+@dataclass(frozen=True)
+class StrandsConfig:
+    region: str
+    model_id: str
+    profile: str | None = None
+    session_name: str | None = None
+
+    @classmethod
+    def from_env(cls) -> "StrandsConfig":
+        return cls(
+            region=os.getenv("AWS_REGION", "us-east-1"),
+            model_id=os.getenv("CLEARFRAME_BEDROCK_MODEL_ID", ""),
+            profile=os.getenv("CLEARFRAME_AWS_PROFILE") or None,
+            session_name=os.getenv("CLEARFRAME_AWS_SESSION_NAME") or None,
+        )
+
+    def validate(self) -> None:
+        if not self.model_id:
+            raise ValueError("CLEARFRAME_BEDROCK_MODEL_ID must be configured for the Strands provider.")
