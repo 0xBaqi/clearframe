@@ -36,6 +36,7 @@ class PersistentCaseWorkflowTests(unittest.TestCase):
         self.assertEqual(after_unsigned.status, Status.AWAITING_RESPONSE)
         self.assertEqual(after_unsigned.requests, ["request-daniel-1", "correction-daniel-2"])
 
+        # Recreate the service to prove that both the case and received evidence persist locally.
         resumed_service = self.service()
         completed = resumed_service.receive_daniel_release(daniel_release("daniel-signed", signed=True))
         self.assertEqual(completed.status, Status.EVIDENCE_COMPLETE)
