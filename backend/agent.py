@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from backend.evidence_tools import ClearanceTools, SeedEvidenceRepository
-from backend.models import ClearanceResult, ProjectIntent, Status
+from backend.models import ClearanceResult, EvidenceRecord, ProjectIntent, Status
 
 
 class ClearanceAgent(Protocol):
