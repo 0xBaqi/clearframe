@@ -1,0 +1,44 @@
+"""Strands tool definitions. Every mutation delegates to application services."""
+from dataclasses import asdict
+
+from packages.core.types import EvidenceRecord
+
+
+def build_strands_tools(service):
+    """Create the narrow NIGHT SHIFT tool set; Strands is imported only when used."""
+    from strands import tool
+
+    @tool
+    def inspect_clearance_item(item_id: str) -> dict:
+        """Inspect the recorded clearance state for one item without changing it."""
+        case = service.workflow.state.cases.get(item_id)
+        item = next(item for item in service.workflow.repository.list_clearance_items() if item.id == item_id)
+        return {"item": asdict(item), "case": asdict(case) if case else None}
+
+    @tool
+    def inspect_evidence(item_id: str) -> list[dict]:
+        """Inspect submitted evidence records for an item without changing them."""
+        return [asdict(record) for record in service.workflow.repository.find_evidence(item_id)]
+
+    @tool
+    def request_evidence(item_id: str) -> dict:
+        """Request evidence through the provider-neutral application service."""
+        return asdict(service.request_evidence(item_id))
+
+    @tool
+    def process_incoming_document(id: str, item_id: str, document_type: str, signed: bool, dated: bool, distribution: list[str], territories: list[str], expires_on: str, extract_confidence: str, notes: str) -> dict:
+        """Process an incoming document only through the application service."""
+        record = EvidenceRecord(id, item_id, document_type, signed, dated, distribution, territories, expires_on, extract_confidence, notes)
+        return asdict(service.receive_document(record))
+
+    @tool
+    def request_human_review(item_id: str) -> dict:
+        """Pause an ambiguous case and request human review through the application service."""
+        return asdict(service.request_human_review(item_id))
+
+    @tool
+    def record_human_decision(item_id: str, decision: str) -> dict:
+        """Record a human decision and resume the paused workflow through the application service."""
+        return asdict(service.record_human_decision(item_id, decision))
+
+    return [inspect_clearance_item, inspect_evidence, request_evidence, process_incoming_document, request_human_review, record_human_decision]
