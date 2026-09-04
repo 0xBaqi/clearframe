@@ -1,0 +1,26 @@
+import json, tempfile, unittest
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+from threading import Thread
+from urllib.request import Request, urlopen
+from services.api import NightShiftAPI, handler_for
+class APITests(unittest.TestCase):
+ def setUp(self): self.temp=tempfile.TemporaryDirectory(); self.api=NightShiftAPI(Path(self.temp.name)/"state.json")
+ def tearDown(self): self.temp.cleanup()
+ def test_project_and_events_start_empty(self): self.assertEqual(self.api.payload()["events"],[])
+ def test_http_project_and_event_routes(self):
+  server=ThreadingHTTPServer(("127.0.0.1",0),handler_for(self.api)); thread=Thread(target=server.serve_forever,daemon=True); thread.start()
+  try:
+   project=json.load(urlopen(f"http://127.0.0.1:{server.server_port}/api/project")); self.assertEqual(project["project_id"],"night-shift")
+   json.load(urlopen(Request(f"http://127.0.0.1:{server.server_port}/api/demo/advance",data=b"{}",method="POST")))
+   events=json.load(urlopen(f"http://127.0.0.1:{server.server_port}/api/events")); self.assertEqual(events["events"][0]["event_type"],"DOCUMENT_RECEIVED")
+  finally: server.shutdown(); thread.join(); server.server_close()
+ def test_advance_and_complete_persist(self):
+  self.api.advance(); self.assertGreater(len(self.api.payload()["events"]),0); result=self.api.complete(); self.assertEqual(result["cases"]["daniel"]["status"],"EVIDENCE_COMPLETE")
+  self.assertEqual([event["event_type"] for event in result["events"] if event["item_id"] == "daniel"][-7:],["EVIDENCE_REQUESTED","DOCUMENT_RECEIVED","DOCUMENT_DEFICIENCY_FOUND","CORRECTION_REQUESTED","DOCUMENT_RECEIVED","EVIDENCE_MATCHED","ITEM_EVIDENCE_COMPLETE"])
+ def test_reset_and_human_decision(self):
+  self.api.complete(); self.assertEqual(self.api.payload()["cases"]["painting"]["status"],"HUMAN_DECISION_RECORDED"); self.api.reset(); self.assertEqual(self.api.payload()["events"],[])
+ def test_human_gate_pauses_then_resumes(self):
+  for _ in range(4): self.api.advance()
+  self.assertTrue(self.api.payload()["cases"]["painting"]["paused"]); self.api.decision({"decision":"Remove artwork."}); self.assertFalse(self.api.payload()["cases"]["painting"]["paused"])
+if __name__=="__main__": unittest.main()
