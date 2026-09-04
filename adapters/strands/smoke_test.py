@@ -1,16 +1,1 @@
-"""Optional live Bedrock smoke test. It performs no state mutation."""
-from adapters.local import LocalInbox, LocalProjectStore
-from adapters.strands import StrandsProvider
-from backend.seed import NIGHT_SHIFT_INTENT, night_shift_repository
-from packages.core.clearance import ClearanceCaseWorkflow
-from services.agent import ClearanceApplicationService
-import tempfile
-from pathlib import Path
-
-
-if __name__ == "__main__":
-    with tempfile.TemporaryDirectory() as directory:
-        workflow = ClearanceCaseWorkflow(night_shift_repository(), NIGHT_SHIFT_INTENT, LocalProjectStore(Path(directory) / "state.json"))
-        provider = StrandsProvider(night_shift_repository(), ClearanceApplicationService(workflow, LocalInbox()))
-        provider.run(NIGHT_SHIFT_INTENT)
-        print("Strands Bedrock smoke test completed.")
+"""Optional live Bedrock smoke test. It performs no state mutation.""" from adapters.local import LocalInbox, LocalProjectStore from adapters.strands import StrandsProvider from backend.seed import NIGHT_SHIFT_INTENT, night_shift_repository from packages.core.clearance import ClearanceCaseWorkflow from services.agent import ClearanceApplicationService import tempfile from pathlib import Path   if __name__ == "__main__":     with tempfile.TemporaryDirectory() as directory:         workflow = ClearanceCaseWorkflow(night_shift_repository(), NIGHT_SHIFT_INTENT, LocalProjectStore(Path(directory) / "state.json"))         provider = StrandsProvider(night_shift_repository(), ClearanceApplicationService(workflow, LocalInbox()))         provider.run(NIGHT_SHIFT_INTENT)         print("Strands Bedrock smoke test completed.")
