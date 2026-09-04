@@ -18,7 +18,15 @@ The repository contains a Next.js Clearance Reel prototype and a local Python ag
 & 'C:\\Users\\NURUDEEN\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe' backend/run_demo.py
 ```
 
-### Run the web prototype
+### Run the local demo
+
+Start the provider-neutral API first (it uses the local deterministic provider by default):
+
+```powershell
+python -m services.api
+```
+
+Then start the web app in a second terminal:
 
 ```powershell
 cd apps/web
@@ -26,7 +34,7 @@ npm install
 npm run dev
 ```
 
-The web view currently renders the same fictional seed state. Connecting it to the agent API is a later milestone.
+The web app reads project state and the global production audit from `http://localhost:8000` by default. Copy `.env.example` to configure `NEXT_PUBLIC_CLEARFRAME_API_URL`, the API port, or the CORS origin for local development. The API persists the NIGHT SHIFT state in `.clearframe/night-shift.json`; **Reset demo** safely reseeds it.
 
 Install the backend dependency with `pip install -r backend/requirements.txt` when preparing a dedicated Python environment. The deterministic run is intentionally offline; a dedicated Strands adapter owns future Bedrock integration without changing product rules.
 
