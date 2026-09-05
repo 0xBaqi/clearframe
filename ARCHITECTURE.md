@@ -13,11 +13,12 @@ ClearFrame API contract
         ▼
 Agent-provider contract ──► provider adapter ──► core evidence tools ──► record/file adapters
         │                                │
-        │                                ├─ local seed (Milestone 1)
+        │                                ├─ local fixture evidence / JSON state (current)
         │                                ├─ S3 (later)
         │                                └─ DynamoDB (later state)
         ▼
-Strands adapter ──► Amazon Bedrock / AgentCore Runtime (optional deployment path)
+Strands adapter ──► Amazon Bedrock (implemented; quota-blocked)
+                   AgentCore Runtime (future deployment target)
 ```
 
 ## Package boundaries
@@ -43,9 +44,9 @@ The tool layer owns facts:
 - `compare_scope_to_intent` compares explicit permissions with distribution, territory, and duration intent.
 - `escalate_for_human_review` creates a review event when records cannot establish an administrative result.
 
-The agent orchestrates these tools and records only operational events. The default deployment runs deterministically locally so tests are repeatable. The implemented Strands adapter invokes Bedrock for assisted extraction when explicitly configured; its output remains constrained to the same tool-mediated data contract. HumanInTheLoop is used for escalation approvals and document-request actions.
+The agent orchestrates these tools and records operational events. The current public deployment uses the deterministic local provider because Bedrock is quota-blocked; it does not execute live Bedrock calls. The implemented Strands adapter constructs a Strands Agent with BedrockModel when explicitly configured and exposes inspection, evidence-request, document-processing, and human-review tools through the application service. Provider errors are surfaced without silent fallback. Human decisions are handled separately through the API, not exposed as Strands tools. The completed-run demo shortcut supplies a scripted human decision.
 
-## Local case state (Milestone 2)
+## Local case state
 
 `LocalProjectStore` persists a JSON project record with item cases, received evidence, document requests, pause state, human decisions, and an ordered operation feed. `ClearanceCaseService` owns workflow transitions: its `operations_tape()` is the data source for the Operations Tape. This is a local adapter with the same seam DynamoDB will occupy later.
 
@@ -59,4 +60,4 @@ For the Scene 07 artwork case, the agent only records the evidence deficiency an
 - Amazon Bedrock: supported model through a dedicated model adapter.
 - AgentCore Runtime: hosted agent execution when deployment adds value.
 
-No AWS credentials are required for the local Milestone 1 fixture.
+No AWS credentials are required for the current local-provider demo. The Bedrock adapter is implemented, but live execution requires available quota and model access. S3, DynamoDB, Strands sessions/state, and AgentCore Runtime above are future targets, not claims about the current public deployment.
