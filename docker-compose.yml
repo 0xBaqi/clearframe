@@ -1,0 +1,23 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    environment:
+      CLEARFRAME_AGENT_PROVIDER: local
+      CLEARFRAME_API_HOST: 0.0.0.0
+      CLEARFRAME_API_PORT: 8000
+      CLEARFRAME_CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_CLEARFRAME_API_URL: http://localhost:8000
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
