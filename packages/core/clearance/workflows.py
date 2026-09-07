@@ -59,10 +59,13 @@ class ClearanceCaseWorkflow:
             self.state.received_evidence.append(asdict(record))
         self._event(EventType.DOCUMENT_RECEIVED, item.id, f"Document received: {record.document_type}.", record.id, EventActor.EXTERNAL)
         case = self._case(item.id, Status.AWAITING_RESPONSE)
-        case.paused = False
-        case = self._case(item.id, Status.AWAITING_RESPONSE)
-        inspected = self.tools.read_permission_scope(record)
         case.evidence_ids.append(record.id)
+        if case.status == Status.HUMAN_REVIEW and case.paused:
+            # Retain evidence for the reviewer; only a human decision opens this gate.
+            self._save()
+            return case
+        case.paused = False
+        inspected = self.tools.read_permission_scope(record)
         if inspected.signed is not True or inspected.dated is not True:
             self._event(EventType.DOCUMENT_DEFICIENCY_FOUND, item.id, "Record is missing a signature or date.", record.id)
             request_id = f"correction-{item.id}-{len(case.requests) + 1}"
